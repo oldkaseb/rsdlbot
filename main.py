@@ -18,7 +18,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import BigInteger
 
-import yt_dlp
+import requests
+from bs4 import BeautifulSoup
 
 # توکن ربات و اطلاعات اتصال به دیتابیس از محیط Railway یا .env
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -95,6 +96,7 @@ def get_back_button():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="back")]])
 
 def detect_platform(url):
+    url = url.lower()
     if "youtube.com" in url or "youtu.be" in url:
         return "YouTube"
     elif "instagram.com" in url:
@@ -105,6 +107,59 @@ def detect_platform(url):
         return "Pinterest"
     else:
         return "ناشناخته"
+
+async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
+    platform = detect_platform(url)
+    user = update.message.from_user
+    error_messages = {
+        "no_platform": "❌ این لینک توسط ربات پشتیبانی نمی‌شود.",
+        "extract_failed": "⚠️ مشکلی در استخراج رسانه پیش آمد. لطفاً دوباره تلاش کنید.",
+        "expired": "⏳ لینک دانلود منقضی شده یا قابل ارسال نیست.",
+    }
+
+    if platform == "ناشناخته":
+        await update.message.reply_text(error_messages["no_platform"])
+        return
+
+    try:
+        if platform == "TikTok":
+            r = requests.post("https://ssstik.io/abc", data={"id": url}, headers={"User-Agent": "Mozilla/5.0"})
+            soup = BeautifulSoup(r.text, "html.parser")
+            media_url = soup.find("a", {"href": True, "download": True})["href"]
+
+        elif platform == "Instagram":
+            r = requests.get(f"https://igram.world/api/convert?url={url}", headers={"User-Agent": "Mozilla/5.0"})
+            media_url = r.json()["media"][0]["url"]
+
+        elif platform == "Pinterest":
+            r = requests.post("https://www.savepin.app/api/download", json={"url": url})
+            media_url = r.json()["data"]["url"]
+
+        elif platform == "YouTube":
+            r = requests.get(f"https://ytdl-api.vercel.app/api?url={url}")
+            media_url = r.json()["url"]
+
+        else:
+            await update.message.reply_text(error_messages["no_platform"])
+            return
+
+        head = requests.head(media_url, allow_redirects=True)
+        if head.status_code != 200 or "text/html" in head.headers.get("content-type", ""):
+            await update.message.reply_text(error_messages["expired"])
+            return
+
+        if media_url.endswith(".mp4"):
+            await update.message.reply_video(video=media_url)
+        elif media_url.endswith(".jpg") or media_url.endswith(".png"):
+            await update.message.reply_photo(photo=media_url)
+        else:
+            await update.message.reply_text(f"🔗 لینک دانلود:\n{media_url}")
+
+        await context.bot.send_message(chat_id=ADMIN_ID, text=f"📥 دانلود توسط:\nID: {user.id}\nName: {user.full_name}\nUsername: @{user.username}\nPlatform: {platform}\nLink: {url}")
+
+    except Exception as e:
+        await update.message.reply_text(error_messages["extract_failed"])
+        await context.bot.send_message(chat_id=ADMIN_ID, text=f"❌ خطا در دانلود:\n{e}\nUser: {user.id} @{user.username}\nLink: {url}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -167,19 +222,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session.close()
         return
 
-    url = update.message.text
-    await update.message.reply_text("در حال دانلود...")
-
-    try:
-        ydl_opts = {'outtmpl': 'downloads/%(title)s.%(ext)s', 'format': 'best'}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            file_path = ydl.prepare_filename(info)
-            await update.message.reply_video(video=open(file_path, 'rb'))
-            await context.bot.send_document(chat_id=ADMIN_ID, document=open(file_path, 'rb'),
-                caption=f"دانلود توسط:\nID: {user.id}\nName: {user.full_name}\nUsername: @{user.username}\nPlatform: {detect_platform(url)}")
-    except Exception as e:
-        await update.message.reply_text(f"خطا در دانلود: {e}")
+    url = update.message.text.strip()
+    await update.message.reply_text("در حال پردازش لینک...")
+    await extract_and_send_media(update, context, url)
     session.close()
 
 async def set_start_banner(update: Update, context: ContextTypes.DEFAULT_TYPE):
