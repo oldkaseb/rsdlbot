@@ -108,7 +108,15 @@ def detect_platform(url):
     else:
         return "ناشناخته"
 
+def resolve_redirects(url):
+    try:
+        r = requests.head(url, allow_redirects=True)
+        return r.url
+    except:
+        return url
+
 async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
+    url = resolve_redirects(url)
     platform = detect_platform(url)
     user = update.message.from_user
     error_messages = {
@@ -160,6 +168,7 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
     except Exception as e:
         await update.message.reply_text(error_messages["extract_failed"])
         await context.bot.send_message(chat_id=ADMIN_ID, text=f"❌ خطا در دانلود:\n{e}\nUser: {user.id} @{user.username}\nLink: {url}")
+        await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
