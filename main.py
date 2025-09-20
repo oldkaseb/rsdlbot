@@ -22,7 +22,7 @@ import yt_dlp
 # توکن ربات و اطلاعات اتصال به دیتابیس از محیط Railway یا .env
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "123456789"))  # آیدی عددی شما
+ADMIN_ID = int(os.getenv("ADMIN_ID", "7662192190"))  # آیدی عددی شما
 
 # ساخت پایه دیتابیس
 Base = declarative_base()
