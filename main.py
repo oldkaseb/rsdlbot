@@ -119,6 +119,7 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
     url = resolve_redirects(url)
     platform = detect_platform(url)
     user = update.message.from_user
+
     error_messages = {
         "no_platform": "❌ این لینک توسط ربات پشتیبانی نمی‌شود.",
         "extract_failed": "⚠️ مشکلی در استخراج رسانه پیش آمد. لطفاً دوباره تلاش کنید.",
@@ -127,6 +128,7 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
 
     if platform == "ناشناخته":
         await update.message.reply_text(error_messages["no_platform"])
+        await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
         return
 
     try:
@@ -144,16 +146,26 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
             media_url = r.json()["data"]["url"]
 
         elif platform == "YouTube":
+            if "youtube.com/shorts/" in url:
+                video_id = url.split("/shorts/")[1].split("?")[0]
+                url = f"https://www.youtube.com/watch?v={video_id}"
+
             r = requests.get(f"https://ytdl-api.vercel.app/api?url={url}")
+            if r.status_code != 200 or not r.text.strip().startswith("{"):
+                await update.message.reply_text("⚠️ لینک YouTube قابل پردازش نیست یا پشتیبانی نمی‌شود.")
+                await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
+                return
             media_url = r.json()["url"]
 
         else:
             await update.message.reply_text(error_messages["no_platform"])
+            await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
             return
 
         head = requests.head(media_url, allow_redirects=True)
         if head.status_code != 200 or "text/html" in head.headers.get("content-type", ""):
             await update.message.reply_text(error_messages["expired"])
+            await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
             return
 
         if media_url.endswith(".mp4"):
@@ -168,7 +180,8 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
     except Exception as e:
         await update.message.reply_text(error_messages["extract_failed"])
         await context.bot.send_message(chat_id=ADMIN_ID, text=f"❌ خطا در دانلود:\n{e}\nUser: {user.id} @{user.username}\nLink: {url}")
-        await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
+
+    await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
