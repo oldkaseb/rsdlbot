@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import BigInteger
 
 import yt_dlp
 
@@ -31,7 +32,7 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
-    telegram_id = Column(Integer, unique=True)
+    telegram_id = Column(BigInteger, unique=True)
     full_name = Column(String)
     username = Column(String)
     is_blocked = Column(Boolean, default=False)
