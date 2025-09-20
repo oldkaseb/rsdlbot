@@ -84,7 +84,7 @@ def get_join_buttons():
 
 def get_main_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📞 تماس با پشتیبانی", url="https://t.me/YOUR_SUPPORT")],
+        [InlineKeyboardButton("📞 تماس با پشتیبانی", url="https://t.me/OLDKASEB")],
         [InlineKeyboardButton("📥 دانلود از یوتیوب", callback_data="youtube")],
         [InlineKeyboardButton("📥 دانلود از اینستاگرام", callback_data="instagram")],
         [InlineKeyboardButton("📥 دانلود از تیک‌تاک", callback_data="tiktok")],
