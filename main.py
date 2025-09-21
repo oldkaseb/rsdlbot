@@ -109,7 +109,46 @@ def detect_platform(url):
     elif "pinterest.com" in url or "pin.it" in url:
         return "Pinterest"
     else:
-        return "unknown"
+        return "Unknown"
+
+def get_instagram_media(url):
+    try:
+        r = requests.post("https://fastdl.app/action.php", data={"url": url}, headers={"User-Agent": "Mozilla/5.0"})
+        soup = BeautifulSoup(r.text, "html.parser")
+        link = soup.find("a", class_="download-btn")
+        return link["href"] if link else None
+    except:
+        return None
+
+def get_pinterest_media(url):
+    try:
+        r = requests.post("https://pindown.io/download", data={"url": url}, headers={"User-Agent": "Mozilla/5.0"})
+        soup = BeautifulSoup(r.text, "html.parser")
+        link = soup.find("a", class_="btn-download")
+        return link["href"] if link else None
+    except:
+        return None
+
+def get_youtube_media(url):
+    try:
+        if "youtube.com" in url:
+            url = url.replace("youtube.com", "ssyoutube.com")
+        elif "youtu.be" in url:
+            url = url.replace("youtu.be", "ssyoutube.com/watch?v=")
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        soup = BeautifulSoup(r.text, "html.parser")
+        link = soup.find("a", class_="def-btn-box")
+        return link["href"] if link else None
+    except:
+        return None
+
+def get_tiktok_media(url):
+    try:
+        r = requests.post("https://tiktokdownload.online/api/ajaxSearch", data={"url": url}, headers={"User-Agent": "Mozilla/5.0"})
+        data = r.json()
+        return data["video"][0]["url"] if "video" in data else None
+    except:
+        return None
 
 async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
     user = update.message.from_user
@@ -118,31 +157,23 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
 
     await update.message.reply_text("🔍 در حال پردازش لینک...")
 
+    if platform == "Instagram":
+        media_url = get_instagram_media(url)
+    elif platform == "Pinterest":
+        media_url = get_pinterest_media(url)
+    elif platform == "YouTube":
+        media_url = get_youtube_media(url)
+    elif platform == "TikTok":
+        media_url = get_tiktok_media(url)
+    else:
+        await update.message.reply_text("❌ این لینک توسط ربات پشتیبانی نمی‌شود.", reply_markup=get_main_menu())
+        return
+
+    if not media_url:
+        await update.message.reply_text("⚠️ مشکلی در استخراج رسانه پیش آمد.", reply_markup=get_main_menu())
+        return
+
     try:
-        if platform == "TikTok":
-            r = requests.post("https://ssstik.io/abc", data={"id": url}, headers={"User-Agent": "Mozilla/5.0"})
-            soup = BeautifulSoup(r.text, "html.parser")
-            media_url = soup.find("a", {"href": True, "download": True})["href"]
-
-        elif platform == "Instagram":
-            r = requests.get(f"https://igram.world/api/convert?url={url}", headers={"User-Agent": "Mozilla/5.0"})
-            media_url = r.json()["media"][0]["url"]
-
-        elif platform == "YouTube":
-            if "youtube.com/shorts/" in url:
-                video_id = url.split("/shorts/")[1].split("?")[0]
-                url = f"https://www.youtube.com/watch?v={video_id}"
-            r = requests.get(f"https://ytdl-api.vercel.app/api?url={url}")
-            media_url = r.json()["url"]
-
-        elif platform == "Pinterest":
-            r = requests.post("https://www.savepin.app/api/download", json={"url": url})
-            media_url = r.json()["data"]["url"]
-
-        else:
-            await update.message.reply_text("❌ این لینک توسط ربات پشتیبانی نمی‌شود.", reply_markup=get_main_menu())
-            return
-
         head = requests.head(media_url, allow_redirects=True)
         if head.status_code != 200 or "text/html" in head.headers.get("content-type", ""):
             await update.message.reply_text("⏳ لینک دانلود منقضی شده یا قابل ارسال نیست.", reply_markup=get_main_menu())
@@ -156,10 +187,9 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
             await update.message.reply_text(f"🔗 لینک دانلود:\n{media_url}")
 
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در استخراج رسانه:\n{e}")
+        await update.message.reply_text(f"⚠️ خطا در ارسال رسانه:\n{e}")
 
     await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
-
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
