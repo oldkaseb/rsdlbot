@@ -25,7 +25,7 @@ from bs4 import BeautifulSoup
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7662192190"))  # آیدی عددی شما
-
+CHANNEL_ID = -1003018425365  # آیدی عددی کانال خصوصی‌ات
 # ساخت پایه دیتابیس
 Base = declarative_base()
 
@@ -155,8 +155,6 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
     url = resolve_redirects(url)
     platform = detect_platform(url)
 
-    await update.message.reply_text("🔍 در حال پردازش لینک...")
-
     if platform == "Instagram":
         media_url = get_instagram_media(url)
     elif platform == "Pinterest":
@@ -166,30 +164,20 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
     elif platform == "TikTok":
         media_url = get_tiktok_media(url)
     else:
-        await update.message.reply_text("❌ این لینک توسط ربات پشتیبانی نمی‌شود.", reply_markup=get_main_menu())
-        return
+        return  # پلتفرم ناشناس
 
     if not media_url:
-        await update.message.reply_text("⚠️ مشکلی در استخراج رسانه پیش آمد.", reply_markup=get_main_menu())
-        return
+        return  # لینک استخراج نشد
 
     try:
-        head = requests.head(media_url, allow_redirects=True)
-        if head.status_code != 200 or "text/html" in head.headers.get("content-type", ""):
-            await update.message.reply_text("⏳ لینک دانلود منقضی شده یا قابل ارسال نیست.", reply_markup=get_main_menu())
-            return
+        # ارسال رسانه به کانال خصوصی
+        sent = await context.bot.send_message(chat_id=CHANNEL_ID, text=media_url)
 
-        if media_url.endswith(".mp4"):
-            await update.message.reply_video(video=media_url)
-        elif media_url.endswith(".jpg") or media_url.endswith(".png"):
-            await update.message.reply_photo(photo=media_url)
-        else:
-            await update.message.reply_text(f"🔗 لینک دانلود:\n{media_url}")
+        # فوروارد به کاربر
+        await context.bot.forward_message(chat_id=user.id, from_chat_id=CHANNEL_ID, message_id=sent.message_id)
 
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ارسال رسانه:\n{e}")
-
-    await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
+        print("خطا در ارسال:", e)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
