@@ -85,11 +85,8 @@ def get_join_buttons():
 
 def get_main_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📞 تماس با پشتیبانی", url="https://t.me/OLDKASEB")],
-        [InlineKeyboardButton("📥 دانلود از یوتیوب", callback_data="youtube")],
-        [InlineKeyboardButton("📥 دانلود از اینستاگرام", callback_data="instagram")],
-        [InlineKeyboardButton("📥 دانلود از تیک‌تاک", callback_data="tiktok")],
-        [InlineKeyboardButton("📥 دانلود از پینترست", callback_data="pinterest")]
+        [InlineKeyboardButton("📥 شروع دانلود", callback_data="start_download")],
+        [InlineKeyboardButton("📞 تماس با پشتیبانی", url="https://t.me/OLDKASEB")]
     ])
 
 def get_back_button():
@@ -218,16 +215,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == "check_join":
-        if await is_user_fully_joined(context.bot, user_id):
-            await query.edit_message_text("✅ عضویت شما تأیید شد.")
-            await context.bot.send_message(chat_id=user_id, text="منوی اصلی:", reply_markup=get_main_menu())
-        else:
-            await query.edit_message_text("❌ هنوز عضو همه‌ی کانال‌ها نیستید.")
-    elif query.data == "back":
-        await query.edit_message_text("منوی اصلی:", reply_markup=get_main_menu())
+    if await is_user_fully_joined(context.bot, user_id):
+        await query.edit_message_text("✅ عضویت شما تأیید شد.")
+        await context.bot.send_message(chat_id=user_id, text="منوی اصلی:", reply_markup=get_main_menu())
     else:
-        context.user_data["platform"] = query.data
-        await query.edit_message_text(f"لطفاً لینک {query.data} را ارسال کنید:", reply_markup=get_back_button())
+        await query.edit_message_text("❌ هنوز عضو همه‌ی کانال‌ها نیستید.")
+
+elif query.data == "start_download":
+    context.user_data["platform"] = "auto"  # چون دیگه پلتفرم رو از لینک تشخیص می‌دیم
+    await query.edit_message_text("لطفاً لینک رسانه را ارسال کنید:", reply_markup=get_back_button())
+
+elif query.data == "back":
+    await query.edit_message_text("منوی اصلی:", reply_markup=get_main_menu())
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
