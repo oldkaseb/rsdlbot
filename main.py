@@ -213,20 +213,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
     await query.answer()
-
     if query.data == "check_join":
-    if await is_user_fully_joined(context.bot, user_id):
-        await query.edit_message_text("✅ عضویت شما تأیید شد.")
-        await context.bot.send_message(chat_id=user_id, text="منوی اصلی:", reply_markup=get_main_menu())
-    else:
-        await query.edit_message_text("❌ هنوز عضو همه‌ی کانال‌ها نیستید.")
-
-elif query.data == "start_download":
-    context.user_data["platform"] = "auto"  # چون دیگه پلتفرم رو از لینک تشخیص می‌دیم
-    await query.edit_message_text("لطفاً لینک رسانه را ارسال کنید:", reply_markup=get_back_button())
-
-elif query.data == "back":
-    await query.edit_message_text("منوی اصلی:", reply_markup=get_main_menu())
+        if await is_user_fully_joined(context.bot, user_id):
+            await query.edit_message_text("✅ عضویت شما تأیید شد.")
+            await context.bot.send_message(chat_id=user_id, text="منوی اصلی:", reply_markup=get_main_menu())
+        else:
+            await query.edit_message_text("❌ هنوز عضو همه‌ی کانال‌ها نیستید.")
+        elif query.data == "start_download":
+            context.user_data["platform"] = "auto"  # چون دیگه پلتفرم رو از لینک تشخیص می‌دیم
+            await query.edit_message_text("لطفاً لینک رسانه را ارسال کنید:", reply_markup=get_back_button())
+    elif query.data == "back":
+await query.edit_message_text("منوی اصلی:", reply_markup=get_main_menu())
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
