@@ -21,10 +21,6 @@ from sqlalchemy import BigInteger
 import requests
 from bs4 import BeautifulSoup
 
-import requests
-from bs4 import BeautifulSoup
-
-
 # توکن ربات و اطلاعات اتصال به دیتابیس از محیط Railway یا .env
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -96,19 +92,6 @@ def get_main_menu():
 def get_back_button():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="back")]])
 
-def detect_platform(url):
-    url = url.lower()
-    if "youtube.com" in url or "youtu.be" in url:
-        return "YouTube"
-    elif "instagram.com" in url:
-        return "Instagram"
-    elif "tiktok.com" in url:
-        return "TikTok"
-    elif "pinterest.com" in url:
-        return "Pinterest"
-    else:
-        return "ناشناخته"
-
 def resolve_redirects(url):
     try:
         r = requests.head(url, allow_redirects=True)
@@ -116,39 +99,53 @@ def resolve_redirects(url):
     except:
         return url
 
+def detect_platform(url):
+    if "tiktok.com" in url:
+        return "TikTok"
+    elif "instagram.com" in url:
+        return "Instagram"
+    elif "youtube.com" in url or "youtu.be" in url:
+        return "YouTube"
+    elif "pinterest.com" in url or "pin.it" in url:
+        return "Pinterest"
+    else:
+        return "unknown"
+
 async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
     user = update.message.from_user
-    await update.message.reply_text("🔍 در حال بررسی لینک در منابع مختلف...")
+    url = resolve_redirects(url)
+    platform = detect_platform(url)
 
-    def try_snapsave(u):
-        try:
-            r = requests.post("https://snapsave.app/action", data={"url": u}, headers={"User-Agent": "Mozilla/5.0"})
-            soup = BeautifulSoup(r.text, "html.parser")
-            link = soup.find("a", {"id": "download-video"})
-            return link["href"] if link else None
-        except:
-            return None
-
-    def try_savetube(u):
-        try:
-            r = requests.post("https://savetube.me/api/ajaxSearch", data={"q": u}, headers={"User-Agent": "Mozilla/5.0"})
-            data = r.json()
-            return data["links"][0]["url"] if "links" in data and data["links"] else None
-        except:
-            return None
-
-    media_url = try_snapsave(url) or try_savetube(url)
-
-    if not media_url:
-        await update.message.reply_text("❌ هیچ منبعی موفق به استخراج رسانه نشد.")
-        await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
-        return
+    await update.message.reply_text("🔍 در حال پردازش لینک...")
 
     try:
+        if platform == "TikTok":
+            r = requests.post("https://ssstik.io/abc", data={"id": url}, headers={"User-Agent": "Mozilla/5.0"})
+            soup = BeautifulSoup(r.text, "html.parser")
+            media_url = soup.find("a", {"href": True, "download": True})["href"]
+
+        elif platform == "Instagram":
+            r = requests.get(f"https://igram.world/api/convert?url={url}", headers={"User-Agent": "Mozilla/5.0"})
+            media_url = r.json()["media"][0]["url"]
+
+        elif platform == "YouTube":
+            if "youtube.com/shorts/" in url:
+                video_id = url.split("/shorts/")[1].split("?")[0]
+                url = f"https://www.youtube.com/watch?v={video_id}"
+            r = requests.get(f"https://ytdl-api.vercel.app/api?url={url}")
+            media_url = r.json()["url"]
+
+        elif platform == "Pinterest":
+            r = requests.post("https://www.savepin.app/api/download", json={"url": url})
+            media_url = r.json()["data"]["url"]
+
+        else:
+            await update.message.reply_text("❌ این لینک توسط ربات پشتیبانی نمی‌شود.", reply_markup=get_main_menu())
+            return
+
         head = requests.head(media_url, allow_redirects=True)
         if head.status_code != 200 or "text/html" in head.headers.get("content-type", ""):
-            await update.message.reply_text("⏳ لینک دانلود منقضی شده یا قابل ارسال نیست.")
-            await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
+            await update.message.reply_text("⏳ لینک دانلود منقضی شده یا قابل ارسال نیست.", reply_markup=get_main_menu())
             return
 
         if media_url.endswith(".mp4"):
@@ -158,12 +155,11 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
         else:
             await update.message.reply_text(f"🔗 لینک دانلود:\n{media_url}")
 
-        await context.bot.send_message(chat_id=ADMIN_ID, text=f"📥 دانلود موفق:\nUser: {user.id} @{user.username}\nLink: {url}\nSource: {'SnapSave' if media_url == try_snapsave(url) else 'SaveTube'}")
-
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطا در ارسال رسانه:\n{e}")
+        await update.message.reply_text(f"⚠️ خطا در استخراج رسانه:\n{e}")
 
     await update.message.reply_text("منوی اصلی:", reply_markup=get_main_menu())
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
