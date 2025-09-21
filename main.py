@@ -439,7 +439,13 @@ async def report_inline_usage(update: Update, context: ContextTypes.DEFAULT_TYPE
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # دستورات متنی
+    # تست اتصال به کانال
+async def test_channel(context):
+    await context.bot.send_message(chat_id=CHANNEL_ID, text="✅ تست اتصال به کانال موفق بود")
+    
+    app.job_queue.run_once(test_channel, when=5)
+
+    # هندلرها
     app.add_handler(CommandHandler("start", start_with_link))
     app.add_handler(CommandHandler("setstart", set_start_banner))
     app.add_handler(CommandHandler("broadcast", broadcast))
@@ -447,18 +453,11 @@ def main():
     app.add_handler(CommandHandler("unblock", unblock_user))
     app.add_handler(CommandHandler("addlock", add_lock))
     app.add_handler(CommandHandler("removelock", remove_lock))
-
-    # پیام‌های متنی (لینک‌ها)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # دکمه‌های اینلاین
     app.add_handler(CallbackQueryHandler(handle_callback))
-
-    # حالت اینلاین
     app.add_handler(InlineQueryHandler(inline_query_handler))
     app.add_handler(ChosenInlineResultHandler(report_inline_usage))
 
-    # اجرای ربات
     print("ربات فعال شد ✅")
     app.run_polling()
 
