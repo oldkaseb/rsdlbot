@@ -92,6 +92,11 @@ def get_main_menu():
 def get_back_button():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="back")]])
 
+async def test_channel(context):
+    await context.bot.send_message(chat_id=CHANNEL_ID, text="✅ تست اتصال به کانال موفق بود")
+
+app.job_queue.run_once(test_channel, 5)
+
 def resolve_redirects(url):
     try:
         r = requests.head(url, allow_redirects=True)
@@ -113,42 +118,79 @@ def detect_platform(url):
 
 def get_instagram_media(url):
     try:
+        # سرویس اصلی: SnapInsta
+        r = requests.post("https://snapinsta.app/action.php", data={"url": url}, headers={"User-Agent": "Mozilla/5.0"})
+        soup = BeautifulSoup(r.text, "html.parser")
+        link = soup.find("a", class_="downloadBtn")
+        if link and link["href"].startswith("http"):
+            return link["href"]
+    except:
+        pass
+
+    try:
+        # پشتیبان: FastDL
         r = requests.post("https://fastdl.app/action.php", data={"url": url}, headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(r.text, "html.parser")
         link = soup.find("a", class_="download-btn")
-        return link["href"] if link else None
+        if link and link["href"].startswith("http"):
+            return link["href"]
     except:
-        return None
+        pass
 
+    return None
+    
 def get_pinterest_media(url):
     try:
+        # سرویس اصلی: PinDown
         r = requests.post("https://pindown.io/download", data={"url": url}, headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(r.text, "html.parser")
         link = soup.find("a", class_="btn-download")
-        return link["href"] if link else None
+        if link and link["href"].startswith("http"):
+            return link["href"]
     except:
-        return None
+        pass
+
+    return None
 
 def get_youtube_media(url):
     try:
+        # سرویس اصلی: SSYouTube
         if "youtube.com" in url:
             url = url.replace("youtube.com", "ssyoutube.com")
         elif "youtu.be" in url:
             url = url.replace("youtu.be", "ssyoutube.com/watch?v=")
+
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(r.text, "html.parser")
         link = soup.find("a", class_="def-btn-box")
-        return link["href"] if link else None
+        if link and link["href"].startswith("http"):
+            return link["href"]
     except:
-        return None
+        pass
+
+    return None
 
 def get_tiktok_media(url):
     try:
+        # سرویس اصلی: SnapTik
+        r = requests.post("https://snaptik.app/abc.php", data={"url": url}, headers={"User-Agent": "Mozilla/5.0"})
+        soup = BeautifulSoup(r.text, "html.parser")
+        link = soup.find("a", class_="download")
+        if link and link["href"].startswith("http"):
+            return link["href"]
+    except:
+        pass
+
+    try:
+        # پشتیبان: TikTokDownload
         r = requests.post("https://tiktokdownload.online/api/ajaxSearch", data={"url": url}, headers={"User-Agent": "Mozilla/5.0"})
         data = r.json()
-        return data["video"][0]["url"] if "video" in data else None
+        if "video" in data and data["video"]:
+            return data["video"][0]["url"]
     except:
-        return None
+        pass
+
+    return None
 
 async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
     user = update.message.from_user
@@ -164,10 +206,12 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
     elif platform == "TikTok":
         media_url = get_tiktok_media(url)
     else:
-        return  # پلتفرم ناشناس
+        await context.bot.send_message(chat_id=ADMIN_ID, text=f"❌ لینک نامعتبر از کاربر {user.id}: {url}")
+        return
 
     if not media_url:
-        return  # لینک استخراج نشد
+        await context.bot.send_message(chat_id=ADMIN_ID, text=f"⚠️ لینک استخراج نشد برای کاربر {user.id}: {url}")
+        return
 
     try:
         # ارسال رسانه به کانال خصوصی
@@ -177,7 +221,7 @@ async def extract_and_send_media(update: Update, context: ContextTypes.DEFAULT_T
         await context.bot.forward_message(chat_id=user.id, from_chat_id=CHANNEL_ID, message_id=sent.message_id)
 
     except Exception as e:
-        print("خطا در ارسال:", e)
+        await context.bot.send_message(chat_id=ADMIN_ID, text=f"❌ خطا در ارسال برای کاربر {user.id}:\n{e}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
